@@ -1,0 +1,8 @@
+.ipynb_checkpoints
+*.Identifier
+cache/
+__pycache__/
+lclib/bin/
+lclib/obj/
+lclib/lib/
+lclib/external_libraries/

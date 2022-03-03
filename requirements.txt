@@ -1,0 +1,7 @@
+geopandas==0.9.0
+matplotlib==3.4.2
+networkx==2.5.1
+numpy==1.21.0
+ray==1.4.1
+scipy==1.7.0
+ortools==9.1.9490
