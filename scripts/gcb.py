@@ -1,5 +1,24 @@
 #!/bin/python3
 
+'''
+ * This file is part of the Gas-Leak-Estimation.
+ * *
+ * @author Kalvik Jakkala
+ * @contact kjakkala@uncc.edu
+ * Repository: https://github.com/UNCCharlotte-CS-Robotics/Gas-Leak-Estimation
+ *
+ * Copyright (C) 2020--2022 Kalvik Jakkala.
+ * The Gas-Leak-Estimation repo is owned by Kalvik Jakkala and is protected by United States copyright laws and applicable international treaties and/or conventions.
+ *
+ * The Gas-Leak-Estimation repo is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * DISCLAIMER OF WARRANTIES: THE SOFTWARE IS PROVIDED "AS-IS" WITHOUT WARRANTY OF ANY KIND INCLUDING ANY WARRANTIES OF PERFORMANCE OR MERCHANTABILITY OR FITNESS FOR A PARTICULAR USE OR PURPOSE OR OF NON-INFRINGEMENT. YOU BEAR ALL RISK RELATING TO QUALITY AND PERFORMANCE OF THE SOFTWARE OR HARDWARE.
+ *
+ * SUPPORT AND MAINTENANCE: No support, installation, or training is provided.
+ *
+ * You should have received a copy of the GNU General Public License along with Gas-Leak-Estimation repo. If not, see <https://www.gnu.org/licenses/>.
+'''
+
 import ray
 import subprocess
 import numpy as np
