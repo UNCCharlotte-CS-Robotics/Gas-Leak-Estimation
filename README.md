@@ -14,7 +14,7 @@ For more details, please see our paper [Probabilistic Gas Leak Rate Estimation u
   year={2022},
   volume={},
   number={},
-  pages={1-1},
+  pages={1-8},
   doi={10.1109/LRA.2022.3149043}}
 ``` 
 
