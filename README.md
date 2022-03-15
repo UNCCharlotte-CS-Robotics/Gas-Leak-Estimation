@@ -10,11 +10,11 @@ For more details, please see our paper [Probabilistic Gas Leak Rate Estimation u
 @ARTICLE{jakkala2022probabilistic,
   author={Jakkala, Kalvik and Akella, Srinivas},
   journal={IEEE Robotics and Automation Letters}, 
-  title={Probabilistic Gas Leak Rate Estimation using Submodular Function Maximization with Routing Constraints}, 
+  title={Probabilistic Gas Leak Rate Estimation Using Submodular Function Maximization With Routing Constraints}, 
   year={2022},
-  volume={},
-  number={},
-  pages={1-8},
+  volume={7},
+  number={2},
+  pages={5230-5237},
   doi={10.1109/LRA.2022.3149043}}
 ``` 
 
