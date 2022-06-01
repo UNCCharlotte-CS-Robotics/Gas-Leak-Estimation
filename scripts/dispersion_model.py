@@ -5,169 +5,160 @@
  * @contact kjakkala@uncc.edu
  * Repository: https://github.com/UNCCharlotte-CS-Robotics/Gas-Leak-Estimation
  *
- * Copyright (C) 2020--2022 Kalvik Jakkala.
- * The Gas-Leak-Estimation repo is owned by Kalvik Jakkala and is protected by United States copyright laws and applicable international treaties and/or conventions.
- *
- * The Gas-Leak-Estimation repo is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
- *
  * DISCLAIMER OF WARRANTIES: THE SOFTWARE IS PROVIDED "AS-IS" WITHOUT WARRANTY OF ANY KIND INCLUDING ANY WARRANTIES OF PERFORMANCE OR MERCHANTABILITY OR FITNESS FOR A PARTICULAR USE OR PURPOSE OR OF NON-INFRINGEMENT. YOU BEAR ALL RISK RELATING TO QUALITY AND PERFORMANCE OF THE SOFTWARE OR HARDWARE.
  *
  * SUPPORT AND MAINTENANCE: No support, installation, or training is provided.
  *
- * You should have received a copy of the GNU General Public License along with Gas-Leak-Estimation repo. If not, see <https://www.gnu.org/licenses/>.
 '''
+
+"""Copyright 2016 National Technology & Engineering 
+    Solutions of Sandia, LLC (NTESS). Under the terms of Contract 
+	DE-NA0003525 with NTESS, the U.S. Government retains certain rights 
+	in this software.
+    
+    Revised BSD License
+
+    Original code repo: https://github.com/sandialabs/chama
+"""
+
+"""
+The simulation module contains methods to run Gaussian air dispersion models. 
+Chama can also integrate simulations from third party software for additional
+sensor placement applications.
+"""
 
 import numpy as np
-from functools import partial
-from scipy.optimize import root
-from scipy.special import gamma
-from scipy.stats import multivariate_normal
-
-'''
-Simplified gas dispersion model that simulates the leak as a 3D Gaussian. 
-Used for testing only, not an accurate gas dispersion simulator. 
-'''
-class SimplifiedDispersionModel:
-    def __init__(self, mean=np.zeros(3), cov=np.eye(3)):
-        self.dist = multivariate_normal(mean, cov)
-
-    def __call__(self, S, x, y, z):
-        return S*self.dist.pdf(np.dstack([x, y, z]))
 
 
-'''
-Gas dispersion model presented in "Estimation of point source fugitive 
-emission rates from a single sensor time series: A conditionally-sampled 
-Gaussian plume reconstruction"
-'''
-class GaussianDispersionModel:
-    '''
-    Args:
-        U:          Wind speed at measurment height z
-        z_s:        Height of source
-        theta:      Direction of wind
-        theta_p:    Direction of peak concentration
-        uw:         Product of the Mean covariance of the horizontal and vertical wind components
-        air_temp:   Mean air temperature
-        sonic_temp: Sonic air temperature
-        sigma_y:    Plume width
-        wt:         Turbulent Intensity
-    '''
-    def __init__(self,
-                 U=1.26,
-                 z_s=1.5,
-                 theta=337.4,
-                 theta_p=155,
-                 uw=0.1,
-                 air_temp=16.25,
-                 sonic_temp=16.25,
-                 sigma_y=0.53,
-                 wt=0.069425843):
-        self.U = U
-        self.z_s = z_s
-        self.theta = theta
-        self.theta_p = theta_p
-        self.uw = uw
-        self.air_temp = air_temp
-        self.sonic_temp = sonic_temp
-        self.sigma_y = sigma_y
-        self.wt = wt
+def _calculate_sigma(x, stability_class):
+    """
+    Calculates sigmay and sigmaz as a function of grid points in the 
+    direction of travel (x) for stability class A through F.
 
-        # Constants
-        self.c = 0.6
-        self.a_1 = 16
-        self.a_2 = 16
-        self.b_1 = 5
-        self.b_2 = 5
-        self.k = 0.41
-        self.p = 1.55
-        self.g = 9.81
+    Parameters
+    ---------------
+    x: numpy array
+        Grid points in the direction of travel (m)
+    stability_class : string
+        Stability class, A through F
+        
+    Returns
+    ---------
+    sigmay: numpy array
+        Standard deviation of the Gaussian distribution in the horizontal
+        (crosswind) direction (m)
+    sigmaz: numpy array
+        Standard deviation of the Gaussian distribution in the vertical
+        direction (m)
+    """
+    if stability_class == 'A':
+        k = [0.250, 927, 0.189, 0.1020, -1.918]
+    elif stability_class == 'B':
+        k = [0.202, 370, 0.162, 0.0962, -0.101]
+    elif stability_class == 'C':
+        k = [0.134, 283, 0.134, 0.0722, 0.102]
+    elif stability_class == 'D':
+        k = [0.0787, 707, 0.135, 0.0475, 0.465]
+    elif stability_class == 'E':
+        k = [0.0566, 1070, 0.137, 0.0335, 0.624]
+    elif stability_class == 'F':
+        k = [0.0370, 1170, 0.134, 0.0220, 0.700]
+    else:
+        return
 
-        self.u_star = np.sqrt(self.uw)
-        self.L = self.obukhov_length()
+    sigmay = k[0] * x / (1 + x / k[1]) ** k[2]
+    sigmaz = k[3] * x / (1 + x / k[1]) ** k[4]
 
-    def obukhov_length(self):
-        return -((self.u_star**3)*self.air_temp)/(self.k*self.g*self.wt)
-
-    def calc_psi(self, z):
-        if self.L < 0:
-            return ((1-(self.a_2*z/self.L))**(1/4))-1
-        else:
-            return -(self.b_2*z/self.L)
-
-    def calc_z_o(self, z):
-        return z/np.exp((self.U*self.k/self.u_star) + self.calc_psi(z))
-
-    def calc_U_bar(self, z, z_o):
-        if self.L < 0:
-            z = self.c*z
-            return (self.u_star/self.k)*(np.log(z/z_o)-self.calc_psi(z))
-        else:
-            return (self.u_star/self.k)*(np.log(z/z_o)-self.calc_psi(z))
-
-    def calc_Lx_x_o(self, z_o, z_bar):
-        z_o += 1e-6
-        if self.L < 0:
-            return (z_bar/(self.k**2))*(np.log(self.c*z_bar/z_o)-\
-                                        self.calc_psi(self.c*z_bar))*\
-                    (1-(self.p*self.a_1*z_bar)/(4*self.L))**(-1/2)
-        else:
-            return (z_bar/(self.k**2))*((np.log(self.c*z_bar/z_o)+\
-                                         ((2*self.b_2*self.p*z_bar)/\
-                                          (3*self.L)))*\
-                                        (1+(self.b_1*self.p*z_bar)/\
-                                         (2*self.L))+(self.b_1/4-self.b_2/6)*\
-                                        self.p*z_bar/self.L)
-
-    def calc_z_bar(self, z_o, Lx_x_o, z_bar):
-        if np.any(np.isnan(z_bar)) or np.any(z_bar<=0):
-            return np.ones_like(z_bar)*100
-        return self.calc_Lx_x_o(z_o, z_bar)-Lx_x_o
+    return sigmay, sigmaz
 
 
-    def calc_s(self, z_bar, z_o):
-        if self.L < 0:
-            return ((1-((self.a_1*self.c*z_bar)/(2*self.L)))/(1-((self.a_1*self.c*z_bar)/self.L))) \
-                    + (((1-((self.a_2*self.c*z_bar)/self.L))**(-1/4))/\
-                    (np.log(self.c*z_bar/z_o)-self.calc_psi(self.c*z_bar)))
-        else:
-            return (1+((2*self.b_1*self.c*z_bar)/self.L))/(1+((self.b_1*self.c*z_bar)/self.L)) \
-                    + (1+((self.b_2*self.c*z_bar)/self.L))/\
-                    (np.log(self.c*z_bar/z_o)+self.calc_psi(z_bar))
+class GaussianPlume:
+    
+    def __init__(self, 
+                 location=(0, 0, 0),
+                 wind_direction=0,
+                 wind_speed=1.0,
+                 stability_class='A'):
+        """
+        Defines the Gaussian plume model.
+        
+        Parameters
+        ---------------
+        location: tuple (x, y, z)
+            x, y, z location of the source (m)
+        wind_direction: float
+            Wind direction (degrees)
+        wind_speed: float
+            Wind speed (m/s)
+        stability_class: string
+            Stability class, A through F            
+        """
+
+        self.loc = location
+        self.wind_direction = wind_direction
+        self.wind_speed = wind_speed
+        self.stability_class = stability_class
 
 
-    def calc_A_B(self, s):
-        return s*gamma(2/s)*(gamma(1/s)**2), gamma(2/s)*gamma(1/s)
+    def _modify_grid(self, X, Y):
+        """
+        Rotates grid to account for wind direction.
+        Translates grid to account for source location.
 
-    def calc_D_z(self, x, z):
-        L_eff = x*np.cos(np.degrees(self.theta-self.theta_p))
-        z_o = self.calc_z_o(z)
-        x_o = self.calc_Lx_x_o(z_o, self.z_s)
-        calc_z_bar_partial = partial(self.calc_z_bar, z_o, L_eff+x_o)
-        z_bar = root(calc_z_bar_partial, np.ones_like(z)).x
-        s = np.abs(self.calc_s(z_bar, z_o))
-        A, B = self.calc_A_B(s)
-        U_bar = self.calc_U_bar(z_bar, z_o)
-        A[A == np.inf] = 0
-        B[B == np.inf] = 0
-        return (A/z_bar)*np.exp(-np.power(B*z/z_bar, s))/U_bar
+        Returns
+        ---------
+        X: numpy array
+            x values in the field (m)
+        Y: numpy array
+            y values in the field (m)
+        """
 
-    def calc_D_y(self, x, y):
-        return (1/(np.sqrt(2*np.pi)*self.sigma_y))*np.exp(-0.5*(y/self.sigma_y)**2)
+        angle_rad = self.wind_direction / 180.0 * np.pi
+        Xloc = (X - self.loc[0]) * np.cos(angle_rad) \
+                + (Y - self.loc[1]) * np.sin(angle_rad)
+        Yloc = - (X - self.loc[0]) * np.sin(angle_rad) \
+                + (Y - self.loc[1]) * np.cos(angle_rad)
 
-    '''
-    Args:
-        S: Stource leak rate
-        x: x coordinate (meters)
-        y: y coordinate (meters)
-        z: z coordinate (meters)
-    '''
-    def __call__(self, S, x, y, z):
-        x = np.array(x, dtype=float)
-        y = np.array(y, dtype=float)
-        z = np.array(z, dtype=float)
+        Xloc[Xloc < 0] = 0
+            
+        return Xloc, Yloc
 
-        return S*self.calc_D_y(x, y)*self.calc_D_z(x, z)
+
+    def __call__(self, rate, X, Y, Z):
+        """
+        Computes the concentrations of a Gaussian plume.
+
+        Parameters
+        ---------------
+        rate: float
+            source leak rate (kg/s)
+        X: numpy array
+            x values (absolute coordinates) in the field (m)
+        Y: numpy array
+            y values (absolute coordinates) in the field (m)
+        Z: numpy array
+            z values (absolute coordinates) in the field (m)
+        """
+
+        X2, Y2 = self._modify_grid(X, Y)
+        sigmay, sigmaz = _calculate_sigma(X2, self.stability_class)
+        
+        a = np.zeros(X2.shape)
+        b = np.zeros(X2.shape)
+        c = np.zeros(X2.shape)
+
+        a[X2 > 0] = rate / \
+                (2 * np.pi * self.wind_speed * sigmay[X2 > 0] * sigmaz[X2 > 0])
+        b[X2 > 0] = np.exp(-Y2[X2 > 0] ** 2 / (2 * sigmay[X2 > 0] ** 2))
+        c[X2 > 0] = np.exp(-(Z[X2 > 0] - self.loc[2]) ** 2 /
+                            (2 * sigmaz[X2 > 0] ** 2)) \
+                    + np.exp(-(Z[X2 > 0] + self.loc[2]) ** 2 /
+                            (2 * sigmaz[X2 > 0] ** 2))
+        
+        conc = a * b * c
+        conc[np.isnan(conc)] = 0
+        
+        return conc
 
 
 if __name__=='__main__':

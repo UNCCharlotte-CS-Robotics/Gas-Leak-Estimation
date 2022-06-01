@@ -28,15 +28,15 @@ if __name__=='__main__':
     gev_eer = defaultdict(lambda: [])
     gauss_eer = defaultdict(lambda: [])
 
-    model_gev = GEVEstimator(0.6)
-    model_gau = GaussEstimator(0.6)
+    model_gev = GEVEstimator(1.0)
+    model_gau = GaussEstimator(1.0)
 
     y = np.linspace(-1, 1, 100)
     x = np.ones_like(y)
     z = np.ones_like(x)
 
-    for dist in [0.2, 0.8, 1.4, 2.4, 3.0, 5.0]:
-        for _ in range(10):
+    for dist in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]:
+        for _ in range(1):
             start_gev = time.time()
             eer_gev = model_gev(x*dist, y, z)
             end_gev = time.time()
@@ -50,8 +50,9 @@ if __name__=='__main__':
             gauss_time[dist].append(end_gau-start_gau)
             gauss_eer[dist].append(eer_gau)
 
-        print("{} & {:.4E} & {:.4E} & {:.5f} & {:.5f} \\".format(dist,
+        print("{} & {:.6E} & {:.6E} & {:.5f} & {:.5f} \\\\".format(dist,
                                                                  np.mean(gev_eer[dist]),
                                                                  np.mean(gauss_eer[dist]),
                                                                  np.mean(gev_time[dist]),
                                                                  np.mean(gauss_time[dist])))
+
